@@ -6,6 +6,7 @@
     draft: "focusline.draft.v1",
     draftTitle: "focusline.draft-title.v1",
     settings: "focusline.settings.v1",
+    readerHintSeen: "focusline.reader-hint-seen.v1",
   };
 
   const DEFAULT_SAMPLE = `십이월은 모든 달 가운데 가장 잔인한 달이다.
@@ -22,6 +23,7 @@
     longWordPacing: true,
     punctuationPacing: true,
     focusHighlight: true,
+    highContrastFocus: false,
     context: "both",
     theme: "dark",
     fontSize: 100,
@@ -44,12 +46,14 @@
     ended: false,
     timerId: 0,
     wordStartedAt: 0,
+    readStartedAt: 0,
     remainingMs: 0,
     controlsTimerId: 0,
     holdDelayId: 0,
     holdRepeatId: 0,
     holdPointerId: null,
     holdButton: null,
+    stagePointer: null,
     progressSaveTimerId: 0,
     toastTimerId: 0,
     wakeLock: null,
@@ -66,6 +70,7 @@
     readerView: document.querySelector("#readerView"),
     sourceText: document.querySelector("#sourceText"),
     characterCount: document.querySelector("#characterCount"),
+    cleanTextButton: document.querySelector("#cleanTextButton"),
     editorError: document.querySelector("#editorError"),
     wpmRange: document.querySelector("#wpmRange"),
     wpmOutput: document.querySelector("#wpmOutput"),
@@ -74,6 +79,7 @@
     longWordToggle: document.querySelector("#longWordToggle"),
     punctuationToggle: document.querySelector("#punctuationToggle"),
     focusToggle: document.querySelector("#focusToggle"),
+    highContrastFocusToggle: document.querySelector("#highContrastFocusToggle"),
     fontSizeRange: document.querySelector("#fontSizeRange"),
     fontSizeOutput: document.querySelector("#fontSizeOutput"),
     trackingRange: document.querySelector("#trackingRange"),
@@ -87,6 +93,10 @@
     libraryCount: document.querySelector("#libraryCount"),
     libraryList: document.querySelector("#libraryList"),
     libraryEmpty: document.querySelector("#libraryEmpty"),
+    libraryEmptyAction: document.querySelector("#libraryEmptyAction"),
+    libraryExportButton: document.querySelector("#libraryExportButton"),
+    libraryImportButton: document.querySelector("#libraryImportButton"),
+    libraryImportInput: document.querySelector("#libraryImportInput"),
     libraryNewBookButton: document.querySelector("#libraryNewBookButton"),
     libraryCloseButton: document.querySelector("#libraryCloseButton"),
     toast: document.querySelector("#toast"),
@@ -102,6 +112,9 @@
     readerWpm: document.querySelector("#readerWpm"),
     readerWpmDown: document.querySelector("#readerWpmDown"),
     readerWpmUp: document.querySelector("#readerWpmUp"),
+    readerHelpButton: document.querySelector("#readerHelpButton"),
+    readerHelpOverlay: document.querySelector("#readerHelpOverlay"),
+    readerHelpDismissButton: document.querySelector("#readerHelpDismissButton"),
     exitButton: document.querySelector("#exitButton"),
     playButton: document.querySelector("#playButton"),
     playLabel: document.querySelector("#playLabel"),
@@ -109,6 +122,8 @@
     progressRange: document.querySelector("#progressRange"),
     progressOutput: document.querySelector("#progressOutput"),
     remainingTime: document.querySelector("#remainingTime"),
+    portraitContinueButton: document.querySelector("#portraitContinueButton"),
+    portraitExitButton: document.querySelector("#portraitExitButton"),
   };
 
   function clamp(value, minimum, maximum) {
@@ -168,6 +183,17 @@
     return `마지막 읽기 ${date.getMonth() + 1}월 ${date.getDate()}일`;
   }
 
+  function bookTargetWpm(book) {
+    return clamp(Math.round(Number(book?.targetWpm) || state.settings.wpm), 10, 1000);
+  }
+
+  function formatBookReadTime(milliseconds) {
+    const totalMinutes = Math.floor(Math.max(0, Number(milliseconds) || 0) / 60000);
+    if (totalMinutes < 1) return "읽기 시작 전";
+    if (totalMinutes < 60) return `읽기 ${totalMinutes}분`;
+    return `읽기 ${Math.floor(totalMinutes / 60)}시간 ${totalMinutes % 60}분`;
+  }
+
   function updateEditorBookStatus() {
     if (!state.currentBook) {
       dom.currentBookStatus.textContent = "저장하지 않은 글";
@@ -179,7 +205,7 @@
 
     const progress = bookProgressPercent(state.currentBook);
     const progressText = progress >= 100 ? "완독" : `${progress}% 읽음`;
-    dom.currentBookStatus.textContent = `${progressText} · ${lastReadLabel(state.currentBook.lastReadAt)}`;
+    dom.currentBookStatus.textContent = `${progressText} · ${formatBookReadTime(state.currentBook.readMilliseconds)} · ${bookTargetWpm(state.currentBook)}WPM`;
     dom.resetProgressButton.hidden = state.currentBook.lastReadIndex <= 0;
     dom.saveBookButton.textContent = "변경사항 저장";
     dom.startButton.textContent = progress >= 100
@@ -202,6 +228,7 @@
   function renderLibrary() {
     dom.libraryList.replaceChildren();
     dom.libraryEmpty.hidden = state.books.length > 0;
+    dom.libraryEmptyAction.textContent = dom.sourceText.value.trim() ? "현재 글 저장하기" : "글 붙여넣기";
     dom.libraryCount.value = `${state.books.length}권`;
     dom.libraryButtonCount.value = String(state.books.length);
 
@@ -226,7 +253,12 @@
       progressTrack.append(progressBar);
 
       const metadata = document.createElement("p");
-      metadata.textContent = lastReadLabel(book.lastReadAt);
+      metadata.textContent = [
+        lastReadLabel(book.lastReadAt),
+        `${book.wordCount.toLocaleString("ko-KR")}단어`,
+        formatBookReadTime(book.readMilliseconds),
+        `목표 ${bookTargetWpm(book)}WPM`,
+      ].join(" · ");
 
       const actions = document.createElement("div");
       actions.className = "library-book-actions";
@@ -287,12 +319,14 @@
     window.clearTimeout(state.progressSaveTimerId);
     state.progressSaveTimerId = 0;
     state.currentBook = { ...book };
+    state.settings.wpm = bookTargetWpm(book);
     state.editorDirty = false;
     dom.bookTitle.value = book.title;
     dom.sourceText.value = book.content;
     localStorage.setItem(STORAGE_KEYS.activeBookId, book.id);
     localStorage.setItem(STORAGE_KEYS.draft, book.content);
     localStorage.setItem(STORAGE_KEYS.draftTitle, book.title);
+    syncControlsFromSettings();
     updateCharacterCount();
     updateEditorBookStatus();
     closeLibrary();
@@ -342,6 +376,8 @@
       lastReadAt: previous?.lastReadAt || 0,
       lastReadIndex: clamp(previous?.lastReadIndex || 0, 0, Math.max(0, tokens.length - 1)),
       wordCount: tokens.length,
+      readMilliseconds: previous?.readMilliseconds || 0,
+      targetWpm: state.settings.wpm,
       completed: Boolean(previous?.completed && previous.content === content),
     };
 
@@ -371,6 +407,10 @@
         0,
         tokenizeText(state.currentBook.content).length,
         false,
+        {
+          readMilliseconds: state.currentBook.readMilliseconds,
+          targetWpm: bookTargetWpm(state.currentBook),
+        },
       );
       if (updated) state.currentBook = updated;
       updateEditorBookStatus();
@@ -399,7 +439,10 @@
       nextBook.lastReadIndex = 0;
       nextBook.lastReadAt = Date.now();
       nextBook.completed = false;
-      window.FocuslineLibrary.updateProgress(nextBook.id, 0, nextBook.wordCount, false).then(refreshLibrary).catch(() => {
+      window.FocuslineLibrary.updateProgress(nextBook.id, 0, nextBook.wordCount, false, {
+        readMilliseconds: nextBook.readMilliseconds,
+        targetWpm: bookTargetWpm(nextBook),
+      }).then(refreshLibrary).catch(() => {
         showToast("진행률을 초기화하지 못했습니다.", true);
       });
     }
@@ -440,6 +483,65 @@
     }
   }
 
+  async function saveOrFocusFromLibrary() {
+    if (!dom.sourceText.value.trim()) {
+      closeLibrary();
+      dom.sourceText.focus();
+      return;
+    }
+    const saved = await saveCurrentBook();
+    if (saved) closeLibrary();
+  }
+
+  function exportLibraryBackup() {
+    const payload = {
+      app: "FOCUSLINE",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      books: state.books,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `focusline-library-${date}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    showToast(`${state.books.length}권을 백업했습니다.`);
+  }
+
+  async function importLibraryBackup(file) {
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      const incomingBooks = Array.isArray(payload) ? payload : payload?.books;
+      if (!Array.isArray(incomingBooks)) throw new Error("FOCUSLINE 백업 파일이 아닙니다.");
+
+      const validBooks = incomingBooks.filter((book) => (
+        book && typeof book === "object" && typeof book.content === "string" && book.content.trim()
+      ));
+      if (!validBooks.length) throw new Error("가져올 책이 없습니다.");
+
+      const existingIds = new Set(state.books.map((book) => book.id));
+      let importedCount = 0;
+      for (const book of validBooks) {
+        const hasCollision = existingIds.has(book.id);
+        const saved = await window.FocuslineLibrary.saveBook({
+          ...book,
+          id: hasCollision ? "" : book.id,
+          title: hasCollision ? `${book.title || deriveBookTitle(book.content)} (가져옴)` : book.title,
+        });
+        existingIds.add(saved.id);
+        importedCount += 1;
+      }
+      await refreshLibrary();
+      showToast(`${importedCount}권을 가져왔습니다.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "백업을 가져오지 못했습니다.", true);
+    }
+  }
+
   function setRangeProgress(input) {
     const minimum = Number(input.min) || 0;
     const maximum = Number(input.max) || 100;
@@ -461,6 +563,7 @@
     };
     document.documentElement.style.setProperty("--reader-font", fonts[state.settings.typeface] || fonts.serif);
     dom.readerView.classList.toggle("focus-off", !state.settings.focusHighlight);
+    dom.readerView.classList.toggle("focus-high-contrast", state.settings.focusHighlight && state.settings.highContrastFocus);
   }
 
   function syncControlsFromSettings() {
@@ -468,6 +571,7 @@
     dom.longWordToggle.checked = state.settings.longWordPacing;
     dom.punctuationToggle.checked = state.settings.punctuationPacing;
     dom.focusToggle.checked = state.settings.focusHighlight;
+    dom.highContrastFocusToggle.checked = state.settings.highContrastFocus;
     dom.fontSizeRange.value = String(state.settings.fontSize);
     dom.trackingRange.value = String(state.settings.tracking);
     dom.typefaceSelect.value = state.settings.typeface;
@@ -594,6 +698,14 @@
     dom.remainingTime.value = `남은 시간 ${formatRemaining(remainingDurationMs())}`;
   }
 
+  function recordReadingDuration() {
+    if (!state.readStartedAt) return;
+    const elapsed = Math.max(0, performance.now() - state.readStartedAt);
+    state.readStartedAt = 0;
+    if (!state.currentBook) return;
+    state.currentBook.readMilliseconds = Math.max(0, Number(state.currentBook.readMilliseconds) || 0) + elapsed;
+  }
+
   function persistBookProgress(immediate = false) {
     if (!state.currentBook || !state.tokens.length) return Promise.resolve(null);
 
@@ -601,12 +713,15 @@
     state.currentBook.wordCount = state.tokens.length;
     state.currentBook.lastReadAt = Date.now();
     state.currentBook.completed = state.ended;
+    state.currentBook.targetWpm = state.settings.wpm;
     const cachedBook = state.books.find((book) => book.id === state.currentBook.id);
     if (cachedBook) {
       cachedBook.lastReadIndex = state.currentBook.lastReadIndex;
       cachedBook.wordCount = state.currentBook.wordCount;
       cachedBook.lastReadAt = state.currentBook.lastReadAt;
       cachedBook.completed = state.currentBook.completed;
+      cachedBook.readMilliseconds = state.currentBook.readMilliseconds;
+      cachedBook.targetWpm = state.currentBook.targetWpm;
     }
 
     const writeProgress = async () => {
@@ -617,6 +732,10 @@
           state.currentBook.lastReadIndex,
           state.currentBook.wordCount,
           state.currentBook.completed,
+          {
+            readMilliseconds: state.currentBook.readMilliseconds,
+            targetWpm: state.currentBook.targetWpm,
+          },
         );
         if (updated && state.currentBook?.id === updated.id) state.currentBook = updated;
         return updated;
@@ -695,6 +814,7 @@
     if (!state.playing) return;
 
     if (state.index >= state.tokens.length - 1) {
+      recordReadingDuration();
       state.playing = false;
       state.ended = true;
       state.remainingMs = 0;
@@ -723,6 +843,7 @@
 
     state.playing = true;
     state.hasPlayed = true;
+    state.readStartedAt = performance.now();
     state.remainingMs = state.remainingMs || state.durations[state.index];
     renderWord();
     scheduleCurrentWord();
@@ -733,6 +854,7 @@
     if (!state.playing) return;
     const elapsed = performance.now() - state.wordStartedAt;
     state.remainingMs = Math.max(20, state.remainingMs - elapsed);
+    recordReadingDuration();
     state.playing = false;
     clearPlaybackTimer();
     renderWord();
@@ -743,6 +865,27 @@
   function togglePlayback() {
     if (state.playing) pause();
     else play();
+  }
+
+  function beginStageTap(event) {
+    if (!state.playing) return;
+    state.stagePointer = {
+      id: event.pointerId,
+      startedAt: performance.now(),
+      x: event.clientX,
+      y: event.clientY,
+    };
+  }
+
+  function endStageTap(event) {
+    const start = state.stagePointer;
+    state.stagePointer = null;
+    if (!start || start.id !== event.pointerId || !state.playing) return;
+    const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+    if (performance.now() - start.startedAt <= 320 && distance < 18) {
+      event.preventDefault();
+      pause();
+    }
   }
 
   function seekTo(index, preservePlayback = true) {
@@ -862,6 +1005,10 @@
     const wasPlaying = state.playing;
     if (wasPlaying) pause();
     state.settings.wpm = clamp(Math.round(Number(value) || 300), 10, 1000);
+    if (state.currentBook) {
+      state.currentBook.targetWpm = state.settings.wpm;
+      markEditorDirty();
+    }
     rebuildTiming();
     state.remainingMs = state.durations[state.index] || 0;
     dom.wpmRange.value = String(state.settings.wpm);
@@ -914,6 +1061,19 @@
     }
   }
 
+  function showReaderHelp(force = false) {
+    if (!force && localStorage.getItem(STORAGE_KEYS.readerHintSeen) === "true") return;
+    dom.readerHelpOverlay.hidden = false;
+    dom.readerView.classList.add("help-open");
+    dom.readerHelpDismissButton.focus();
+  }
+
+  function hideReaderHelp() {
+    dom.readerHelpOverlay.hidden = true;
+    dom.readerView.classList.remove("help-open");
+    localStorage.setItem(STORAGE_KEYS.readerHintSeen, "true");
+  }
+
   function startReader() {
     const tokens = tokenizeText(dom.sourceText.value);
     if (!tokens.length) {
@@ -938,16 +1098,19 @@
     state.playing = false;
     state.hasPlayed = false;
     state.ended = false;
+    state.readStartedAt = 0;
     rebuildTiming();
     state.remainingMs = state.durations[0];
 
     document.body.classList.add("reading");
     dom.readerView.hidden = false;
+    dom.readerView.classList.remove("portrait-allowed");
     updateCssSettings();
     renderWord();
     if (restartCompletedBook) persistBookProgress(true);
     requestImmersiveMode();
     showControls();
+    showReaderHelp();
   }
 
   async function exitReader() {
@@ -956,6 +1119,8 @@
     await persistBookProgress(true);
     document.body.classList.remove("reading");
     dom.readerView.hidden = true;
+    dom.readerHelpOverlay.hidden = true;
+    dom.readerView.classList.remove("help-open", "portrait-allowed");
     await releaseImmersiveMode();
     updateEditorBookStatus();
     refreshLibrary();
@@ -973,6 +1138,35 @@
     state.controlsTimerId = window.setTimeout(() => {
       dom.readerView.classList.remove("controls-visible");
     }, 700);
+  }
+
+  function cleanPastedText(text) {
+    return String(text)
+      .normalize("NFC")
+      .replace(/\r\n?/gu, "\n")
+      .replace(/\u00adu/gu, "")
+      .replace(/[ \t]+\n/gu, "\n")
+      .replace(/\n[ \t]+/gu, "\n")
+      .split(/\n{2,}/gu)
+      .map((paragraph) => paragraph.replace(/\n+/gu, " ").replace(/[ \t]{2,}/gu, " ").trim())
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  function cleanCurrentText() {
+    const cleaned = cleanPastedText(dom.sourceText.value);
+    if (!cleaned) {
+      showToast("정리할 본문을 먼저 붙여넣어 주세요.", true);
+      return;
+    }
+    if (cleaned === dom.sourceText.value) {
+      showToast("이미 읽기 좋게 정리되어 있습니다.");
+      return;
+    }
+    dom.sourceText.value = cleaned;
+    updateCharacterCount();
+    markEditorDirty();
+    showToast("본문 줄바꿈과 공백을 정리했습니다.");
   }
 
   function updateCharacterCount() {
@@ -999,6 +1193,7 @@
     state.settings.longWordPacing = dom.longWordToggle.checked;
     state.settings.punctuationPacing = dom.punctuationToggle.checked;
     state.settings.focusHighlight = dom.focusToggle.checked;
+    state.settings.highContrastFocus = dom.highContrastFocusToggle.checked;
     updateCssSettings();
     saveSettings();
   }
@@ -1008,6 +1203,7 @@
       updateCharacterCount();
       markEditorDirty();
     });
+    dom.cleanTextButton.addEventListener("click", cleanCurrentText);
     dom.bookTitle.addEventListener("input", markEditorDirty);
     dom.newBookButton.addEventListener("click", () => createNewBook());
     dom.libraryNewBookButton.addEventListener("click", () => createNewBook());
@@ -1015,6 +1211,14 @@
     dom.libraryCloseButton.addEventListener("click", closeLibrary);
     dom.libraryBackdrop.addEventListener("click", closeLibrary);
     dom.libraryList.addEventListener("click", handleLibraryAction);
+    dom.libraryEmptyAction.addEventListener("click", saveOrFocusFromLibrary);
+    dom.libraryExportButton.addEventListener("click", exportLibraryBackup);
+    dom.libraryImportButton.addEventListener("click", () => dom.libraryImportInput.click());
+    dom.libraryImportInput.addEventListener("change", () => {
+      const [file] = dom.libraryImportInput.files;
+      dom.libraryImportInput.value = "";
+      importLibraryBackup(file);
+    });
     dom.saveBookButton.addEventListener("click", () => saveCurrentBook());
     dom.resetProgressButton.addEventListener("click", resetCurrentProgress);
     dom.startButton.addEventListener("click", startReader);
@@ -1023,7 +1227,7 @@
     dom.wpmUp.addEventListener("click", () => setWpm(adjustedWpm(1)));
     dom.readerWpmDown.addEventListener("click", () => setWpm(adjustedWpm(-1)));
     dom.readerWpmUp.addEventListener("click", () => setWpm(adjustedWpm(1)));
-    [dom.longWordToggle, dom.punctuationToggle, dom.focusToggle].forEach((input) => {
+    [dom.longWordToggle, dom.punctuationToggle, dom.focusToggle, dom.highContrastFocusToggle].forEach((input) => {
       input.addEventListener("change", applyPacingControlChange);
     });
 
@@ -1074,9 +1278,21 @@
     dom.playButton.addEventListener("click", togglePlayback);
     dom.rewindButton.addEventListener("click", rewindSentence);
     dom.exitButton.addEventListener("click", exitReader);
+    dom.readerHelpButton.addEventListener("click", () => showReaderHelp(true));
+    dom.readerHelpDismissButton.addEventListener("click", hideReaderHelp);
+    dom.portraitContinueButton.addEventListener("click", () => {
+      dom.readerView.classList.add("portrait-allowed");
+    });
+    dom.portraitExitButton.addEventListener("click", exitReader);
     dom.progressRange.addEventListener("input", () => {
       const index = (Number(dom.progressRange.value) / 1000) * Math.max(0, state.tokens.length - 1);
       seekTo(index, false);
+    });
+
+    dom.readerStage.addEventListener("pointerdown", beginStageTap);
+    dom.readerStage.addEventListener("pointerup", endStageTap);
+    dom.readerStage.addEventListener("pointercancel", () => {
+      state.stagePointer = null;
     });
 
     dom.readerView.addEventListener("pointermove", (event) => {

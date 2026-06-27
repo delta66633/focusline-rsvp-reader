@@ -46,7 +46,10 @@
               spellcheck="false"
               placeholder="읽고 싶은 책의 내용이나 문장을 여기에 붙여넣으세요."
             ></textarea>
-            <output class="character-count" id="characterCount" for="sourceText">0자</output>
+            <div class="editor-text-tools">
+              <button class="clean-text-button" id="cleanTextButton" type="button">본문 정리</button>
+              <output class="character-count" id="characterCount" for="sourceText">0자</output>
+            </div>
           </div>
           <p class="editor-error" id="editorError" role="alert"></p>
         </section>
@@ -79,6 +82,12 @@
           <label class="setting toggle-setting" for="focusToggle">
             <span>초점 글자</span>
             <input id="focusToggle" type="checkbox" checked />
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+
+          <label class="setting toggle-setting" for="highContrastFocusToggle">
+            <span>고대비 초점</span>
+            <input id="highContrastFocusToggle" type="checkbox" />
             <span class="toggle" aria-hidden="true"></span>
           </label>
 
@@ -147,12 +156,18 @@
             <output id="libraryCount">0권</output>
           </div>
           <div class="library-header-actions">
+            <button class="library-utility-button" id="libraryExportButton" type="button">백업</button>
+            <button class="library-utility-button" id="libraryImportButton" type="button">가져오기</button>
             <button class="library-new-button" id="libraryNewBookButton" type="button">+ 새 책</button>
             <button class="library-close-button" id="libraryCloseButton" type="button">닫기</button>
           </div>
         </header>
         <div class="library-list" id="libraryList"></div>
-        <p class="library-empty" id="libraryEmpty">저장한 책이 없습니다</p>
+        <div class="library-empty" id="libraryEmpty">
+          <p>저장한 책이 없습니다</p>
+          <button id="libraryEmptyAction" type="button">현재 글 저장하기</button>
+        </div>
+        <input id="libraryImportInput" type="file" accept="application/json,.json" hidden />
       </aside>
     </div>
 
@@ -165,6 +180,7 @@
           <button class="chrome-button" id="readerWpmDown" type="button" aria-label="읽기 속도 낮추기">−</button>
           <output id="readerWpm">300 WPM</output>
           <button class="chrome-button" id="readerWpmUp" type="button" aria-label="읽기 속도 높이기">+</button>
+          <button class="chrome-button reader-help-button" id="readerHelpButton" type="button" aria-label="읽기 도움말">?</button>
           <button class="text-button" id="exitButton" type="button">편집으로</button>
         </div>
       </header>
@@ -207,12 +223,30 @@
         <output class="remaining-time" id="remainingTime">남은 시간 00:00</output>
       </footer>
 
-      <div class="rotate-notice" aria-hidden="true">
+      <div class="reader-help-overlay" id="readerHelpOverlay" role="dialog" aria-modal="true" aria-labelledby="readerHelpTitle" hidden>
+        <div class="reader-help-card">
+          <p>처음 사용</p>
+          <h2 id="readerHelpTitle">이렇게 읽어요</h2>
+          <ul>
+            <li><strong>재생 중</strong> 화면을 한 번 누르면 바로 멈춥니다.</li>
+            <li><strong>멈춘 뒤</strong> 왼쪽·오른쪽 화면을 누르면 한 단어씩 이동합니다.</li>
+            <li><strong>길게 누르기</strong>는 현재 WPM과 단어 여유에 맞춰 연속 이동합니다.</li>
+          </ul>
+          <button id="readerHelpDismissButton" type="button">알겠어요</button>
+        </div>
+      </div>
+
+      <div class="rotate-notice" id="rotateNotice" role="dialog" aria-modal="true" aria-labelledby="rotateNoticeTitle">
         <svg viewBox="0 0 32 32">
           <rect x="5" y="9" width="22" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
           <path d="M10 5 7 8l3 3M22 27l3-3-3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-        <span>기기를 가로로 돌려주세요</span>
+        <h2 id="rotateNoticeTitle">기기를 가로로 돌려주세요</h2>
+        <p>가로 화면에서 더 편하게 읽을 수 있어요.</p>
+        <div class="rotate-notice-actions">
+          <button id="portraitContinueButton" type="button">세로로 계속</button>
+          <button id="portraitExitButton" type="button">편집으로</button>
+        </div>
       </div>
     </section>
 

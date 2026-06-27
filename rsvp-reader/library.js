@@ -87,6 +87,8 @@
       lastReadAt: Number(book.lastReadAt) || 0,
       lastReadIndex: Math.max(0, Math.round(Number(book.lastReadIndex) || 0)),
       wordCount: Math.max(0, Math.round(Number(book.wordCount) || 0)),
+      readMilliseconds: Math.max(0, Math.round(Number(book.readMilliseconds) || 0)),
+      targetWpm: Math.min(1000, Math.max(10, Math.round(Number(book.targetWpm) || 300))),
       completed: Boolean(book.completed),
     };
   }
@@ -112,7 +114,7 @@
     return record;
   }
 
-  async function updateProgress(id, lastReadIndex, wordCount, completed = false) {
+  async function updateProgress(id, lastReadIndex, wordCount, completed = false, metrics = {}) {
     if (!id) return null;
     return runTransaction("readwrite", async (store) => {
       const book = await requestResult(store.get(id));
@@ -123,6 +125,8 @@
         lastReadIndex,
         wordCount,
         completed,
+        readMilliseconds: metrics.readMilliseconds ?? book.readMilliseconds,
+        targetWpm: metrics.targetWpm ?? book.targetWpm,
       });
       await requestResult(store.put(next));
       return next;
