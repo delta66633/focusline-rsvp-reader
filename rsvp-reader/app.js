@@ -53,6 +53,9 @@
     holdRepeatId: 0,
     holdPointerId: null,
     holdButton: null,
+    keySeekTimerId: 0,
+    keySeekCode: "",
+    keySeekDirection: 0,
     stagePointer: null,
     progressSaveTimerId: 0,
     toastTimerId: 0,
@@ -906,6 +909,55 @@
     seekTo(state.index + offset);
   }
 
+  function stopKeyboardSeek() {
+    window.clearTimeout(state.keySeekTimerId);
+    state.keySeekTimerId = 0;
+    state.keySeekCode = "";
+    state.keySeekDirection = 0;
+  }
+
+  function scheduleKeyboardSeek() {
+    if (!state.keySeekCode || !state.keySeekDirection || state.playing) {
+      stopKeyboardSeek();
+      return;
+    }
+
+    const previousIndex = state.index;
+    seekRelative(state.keySeekDirection);
+    if (state.index === previousIndex) {
+      stopKeyboardSeek();
+      return;
+    }
+
+    const baseIntervalMs = Math.round(60000 / state.settings.wpm);
+    const intervalMs = clamp(state.durations[state.index] || baseIntervalMs, 40, 6000);
+    state.keySeekTimerId = window.setTimeout(scheduleKeyboardSeek, intervalMs);
+  }
+
+  function startKeyboardSeek(event, direction) {
+    if (event.repeat) return;
+
+    if (state.playing) {
+      seekRelative(direction);
+      return;
+    }
+
+    stopKeyboardSeek();
+    state.keySeekCode = event.code;
+    state.keySeekDirection = direction;
+
+    const previousIndex = state.index;
+    seekRelative(direction);
+    if (state.index === previousIndex) {
+      stopKeyboardSeek();
+      return;
+    }
+
+    const baseIntervalMs = Math.round(60000 / state.settings.wpm);
+    const intervalMs = clamp(state.durations[state.index] || baseIntervalMs, 40, 6000);
+    state.keySeekTimerId = window.setTimeout(scheduleKeyboardSeek, intervalMs);
+  }
+
   function stopHoldSeek(button) {
     window.clearTimeout(state.holdDelayId);
     window.clearTimeout(state.holdRepeatId);
@@ -1287,7 +1339,10 @@
     bindHoldSeek(dom.previousHoldButton, -1);
     bindHoldSeek(dom.nextHoldButton, 1);
     ["pointerup", "pointercancel", "mouseup", "touchend", "touchcancel", "blur"].forEach((eventName) => {
-      window.addEventListener(eventName, stopAllHoldSeek, true);
+      window.addEventListener(eventName, () => {
+        stopAllHoldSeek();
+        stopKeyboardSeek();
+      }, true);
     });
     dom.playButton.addEventListener("click", togglePlayback);
     dom.rewindButton.addEventListener("click", rewindSentence);
@@ -1357,10 +1412,18 @@
         togglePlayback();
       } else if (event.key === "ArrowLeft") {
         event.preventDefault();
-        seekRelative(event.shiftKey ? -10 : -1);
+        if (event.shiftKey) {
+          if (!event.repeat) seekRelative(-10);
+          return;
+        }
+        startKeyboardSeek(event, -1);
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
-        seekRelative(event.shiftKey ? 10 : 1);
+        if (event.shiftKey) {
+          if (!event.repeat) seekRelative(10);
+          return;
+        }
+        startKeyboardSeek(event, 1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         setWpm(adjustedWpm(1));
@@ -1372,6 +1435,10 @@
       } else if (event.key.toLowerCase() === "e") {
         exitReader();
       }
+    });
+
+    document.addEventListener("keyup", (event) => {
+      if (event.code === state.keySeekCode) stopKeyboardSeek();
     });
   }
 

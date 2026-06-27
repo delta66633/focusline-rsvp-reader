@@ -1520,18 +1520,24 @@ body[data-theme="light"] .reader-view.focus-high-contrast .focus-guide::after {
 
   .reader-header-actions {
     flex: 0 1 auto;
-    gap: 7px;
+    gap: 4px;
   }
 
   .reader-header output {
-    min-width: 62px;
+    min-width: 55px;
     font-size: 0.7rem;
+  }
+
+  .reader-header .chrome-button {
+    width: 32px;
+    height: 32px;
+    touch-action: manipulation;
   }
 
   .reader-header .text-button {
     flex: 0 0 auto;
-    margin-left: 4px;
-    padding: 7px 0 7px 8px;
+    margin-left: 2px;
+    padding: 7px 0 7px 5px;
     font-size: 0.64rem;
     white-space: nowrap;
   }
