@@ -952,6 +952,14 @@ body.reading .setup-view {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.reader-view * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -1056,6 +1064,7 @@ body.reading .setup-view {
   border: 0;
   outline: 0;
   background: transparent;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .scrub-zone {

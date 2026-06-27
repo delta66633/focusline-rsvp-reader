@@ -1307,6 +1307,10 @@
       hideControlsSoon();
     });
 
+    ["contextmenu", "selectstart", "dragstart"].forEach((eventName) => {
+      dom.readerView.addEventListener(eventName, (event) => event.preventDefault());
+    });
+
     window.addEventListener("resize", () => {
       if (!dom.readerView.hidden) renderWord();
     });
