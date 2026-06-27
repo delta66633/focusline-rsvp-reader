@@ -1506,6 +1506,36 @@ body[data-theme="light"] .reader-view.focus-high-contrast .focus-guide::after {
 }
 
 @media (orientation: portrait) and (max-width: 700px) {
+  .reader-header {
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+
+  .reader-header .brand {
+    flex: 0 0 auto;
+    font-size: 0.68rem;
+    letter-spacing: 0.25em;
+    white-space: nowrap;
+  }
+
+  .reader-header-actions {
+    flex: 0 1 auto;
+    gap: 7px;
+  }
+
+  .reader-header output {
+    min-width: 62px;
+    font-size: 0.7rem;
+  }
+
+  .reader-header .text-button {
+    flex: 0 0 auto;
+    margin-left: 4px;
+    padding: 7px 0 7px 8px;
+    font-size: 0.64rem;
+    white-space: nowrap;
+  }
+
   body.reading .reader-view:not(.portrait-allowed) .rotate-notice {
     position: absolute;
     inset: 0;
@@ -1514,10 +1544,12 @@ body[data-theme="light"] .reader-view.focus-high-contrast .focus-guide::after {
     place-content: center;
     justify-items: center;
     gap: 12px;
+    padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
     background: var(--bg);
     color: var(--muted);
     font-size: 0.82rem;
     letter-spacing: -0.02em;
+    text-align: center;
   }
 
   .rotate-notice svg {
@@ -1537,12 +1569,15 @@ body[data-theme="light"] .reader-view.focus-high-contrast .focus-guide::after {
   }
 
   .rotate-notice-actions {
-    display: flex;
-    gap: 10px;
+    display: grid;
+    width: min(100%, 16rem);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
   }
 
   .rotate-notice-actions button {
-    min-height: 36px;
+    width: 100%;
+    min-height: 42px;
     padding: 0 12px;
     border: 1px solid var(--line);
     border-radius: 3px;
@@ -1554,6 +1589,33 @@ body[data-theme="light"] .reader-view.focus-high-contrast .focus-guide::after {
   .rotate-notice-actions button:first-child {
     border-color: var(--accent);
     color: var(--accent);
+  }
+
+  body.reading .reader-view.portrait-allowed .word-main {
+    font-size: clamp(3rem, 13vw, 5rem);
+  }
+
+  body.reading .reader-view.portrait-allowed .focus-guide {
+    width: clamp(62px, 20vw, 88px);
+    height: clamp(76px, 18vh, 132px);
+  }
+
+  body.reading .reader-view.portrait-allowed .phantom-word {
+    left: 50%;
+    right: auto;
+    width: min(72vw, 28rem);
+    max-width: none;
+    font-size: clamp(1rem, 5vw, 1.4rem);
+    text-align: center;
+    transform: translate(-50%, -50%);
+  }
+
+  body.reading .reader-view.portrait-allowed .phantom-previous {
+    top: calc(50% - clamp(108px, 18vh, 160px));
+  }
+
+  body.reading .reader-view.portrait-allowed .phantom-next {
+    top: calc(50% + clamp(108px, 18vh, 160px));
   }
 }
 

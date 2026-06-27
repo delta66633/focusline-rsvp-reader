@@ -122,6 +122,7 @@
     progressRange: document.querySelector("#progressRange"),
     progressOutput: document.querySelector("#progressOutput"),
     remainingTime: document.querySelector("#remainingTime"),
+    forceLandscapeButton: document.querySelector("#forceLandscapeButton"),
     portraitContinueButton: document.querySelector("#portraitContinueButton"),
     portraitExitButton: document.querySelector("#portraitExitButton"),
   };
@@ -1040,6 +1041,19 @@
     }
   }
 
+  async function requestLandscape() {
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+      }
+      if (!screen.orientation?.lock) throw new Error("orientation-lock-unsupported");
+      await screen.orientation.lock("landscape");
+      showToast("가로 보기로 전환했습니다.");
+    } catch (_error) {
+      showToast("이 기기에서는 가로 전환을 강제할 수 없습니다. 기기를 가로로 돌려주세요.", true);
+    }
+  }
+
   async function releaseImmersiveMode() {
     try {
       if (state.wakeLock) await state.wakeLock.release();
@@ -1280,6 +1294,7 @@
     dom.exitButton.addEventListener("click", exitReader);
     dom.readerHelpButton.addEventListener("click", () => showReaderHelp(true));
     dom.readerHelpDismissButton.addEventListener("click", hideReaderHelp);
+    dom.forceLandscapeButton.addEventListener("click", requestLandscape);
     dom.portraitContinueButton.addEventListener("click", () => {
       dom.readerView.classList.add("portrait-allowed");
     });
