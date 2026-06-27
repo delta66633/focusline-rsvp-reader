@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#090909" />
+    <meta
+      name="description"
+      content="붙여넣은 글을 한 단어씩 보여주는 백엔드 없는 RSVP 속독 리더"
+    />
+    <title>FOCUSLINE — RSVP 리더</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-theme="dark">
+    <main class="setup-view" id="setupView">
+      <header class="setup-header">
+        <a class="brand" href="#" aria-label="FOCUSLINE 처음으로">FOCUSLINE</a>
+        <nav class="setup-header-actions" aria-label="책 관리">
+          <button class="header-action" id="newBookButton" type="button">+ 새 책</button>
+          <button class="header-action library-trigger" id="libraryButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4.5 5.5c2.7-.8 5-.1 7.5 1.7v11c-2.5-1.8-4.8-2.5-7.5-1.7zm15 0c-2.7-.8-5-.1-7.5 1.7v11c2.5-1.8 4.8-2.5 7.5-1.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            </svg>
+            <span>내 서재</span>
+            <output id="libraryButtonCount">0</output>
+          </button>
+        </nav>
+      </header>
+
+      <div class="setup-layout">
+        <section class="editor-panel" aria-labelledby="editorTitle">
+          <h1 id="editorTitle">붙여넣고, 바로 읽기</h1>
+          <div class="book-editor-meta">
+            <label class="sr-only" for="bookTitle">책 제목</label>
+            <input id="bookTitle" type="text" maxlength="120" placeholder="책 제목" autocomplete="off" />
+            <div class="current-book-status">
+              <span id="currentBookStatus">저장하지 않은 글</span>
+              <button id="resetProgressButton" type="button" hidden>처음부터</button>
+            </div>
+          </div>
+          <div class="text-editor-shell">
+            <label class="sr-only" for="sourceText">읽을 글</label>
+            <textarea
+              id="sourceText"
+              maxlength="500000"
+              spellcheck="false"
+              placeholder="읽고 싶은 책의 내용이나 문장을 여기에 붙여넣으세요."
+            ></textarea>
+            <output class="character-count" id="characterCount" for="sourceText">0자</output>
+          </div>
+          <p class="editor-error" id="editorError" role="alert"></p>
+        </section>
+
+        <aside class="settings-panel" aria-label="읽기 설정">
+          <div class="setting setting-speed">
+            <div class="setting-heading">
+              <label for="wpmRange">읽기 속도</label>
+              <output id="wpmOutput" for="wpmRange">300 WPM</output>
+            </div>
+            <div class="range-row">
+              <button class="step-button" id="wpmDown" type="button" aria-label="읽기 속도 낮추기">−</button>
+              <input id="wpmRange" type="range" min="10" max="1000" step="5" value="300" />
+              <button class="step-button" id="wpmUp" type="button" aria-label="읽기 속도 높이기">+</button>
+            </div>
+          </div>
+
+          <label class="setting toggle-setting" for="longWordToggle">
+            <span>긴 단어 여유</span>
+            <input id="longWordToggle" type="checkbox" checked />
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+
+          <label class="setting toggle-setting" for="punctuationToggle">
+            <span>문장부호 여유</span>
+            <input id="punctuationToggle" type="checkbox" checked />
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+
+          <label class="setting toggle-setting" for="focusToggle">
+            <span>초점 글자</span>
+            <input id="focusToggle" type="checkbox" checked />
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+
+          <fieldset class="setting segmented-setting">
+            <legend>주변 단어</legend>
+            <div class="segments" id="contextSegments">
+              <input id="contextNone" type="radio" name="context" value="none" />
+              <label for="contextNone">표시 안 함</label>
+              <input id="contextPrevious" type="radio" name="context" value="previous" />
+              <label for="contextPrevious">이전만</label>
+              <input id="contextBoth" type="radio" name="context" value="both" checked />
+              <label for="contextBoth">이전/다음</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="setting segmented-setting">
+            <legend>테마</legend>
+            <div class="segments theme-segments" id="themeSegments">
+              <input id="themeDark" type="radio" name="theme" value="dark" checked />
+              <label for="themeDark">다크</label>
+              <input id="themeNight" type="radio" name="theme" value="night" />
+              <label for="themeNight">세피아</label>
+              <input id="themeLight" type="radio" name="theme" value="light" />
+              <label for="themeLight">라이트</label>
+            </div>
+          </fieldset>
+
+          <details class="advanced-settings">
+            <summary>세부 설정</summary>
+            <div class="advanced-grid">
+              <label for="fontSizeRange">글자 크기 <output id="fontSizeOutput">100%</output></label>
+              <input id="fontSizeRange" type="range" min="70" max="130" step="5" value="100" />
+
+              <label for="trackingRange">자간 <output id="trackingOutput">0</output></label>
+              <input id="trackingRange" type="range" min="-2" max="3" step="1" value="0" />
+
+              <label for="typefaceSelect">글꼴</label>
+              <select id="typefaceSelect">
+                <option value="serif">명조</option>
+                <option value="sans">고딕</option>
+                <option value="readable">가독성 고딕</option>
+              </select>
+            </div>
+          </details>
+
+          <div class="editor-actions">
+            <button class="save-book-button" id="saveBookButton" type="button">책 저장</button>
+            <button class="start-button" id="startButton" type="button">읽기 시작</button>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="setup-footer" aria-label="키보드 도움말">
+        <span><kbd>Space</kbd> 재생·정지</span>
+        <span><kbd>←</kbd><kbd>→</kbd> 이동</span>
+        <span>입력 내용은 이 브라우저에만 저장</span>
+      </footer>
+    </main>
+
+    <div class="library-layer" id="libraryLayer" hidden>
+      <button class="library-backdrop" id="libraryBackdrop" type="button" aria-label="서재 닫기"></button>
+      <aside class="library-drawer" id="libraryDrawer" role="dialog" aria-modal="true" aria-labelledby="libraryTitle">
+        <header class="library-header">
+          <div>
+            <h2 id="libraryTitle">내 서재</h2>
+            <output id="libraryCount">0권</output>
+          </div>
+          <div class="library-header-actions">
+            <button class="library-new-button" id="libraryNewBookButton" type="button">+ 새 책</button>
+            <button class="library-close-button" id="libraryCloseButton" type="button">닫기</button>
+          </div>
+        </header>
+        <div class="library-list" id="libraryList"></div>
+        <p class="library-empty" id="libraryEmpty">저장한 책이 없습니다</p>
+      </aside>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <section class="reader-view" id="readerView" aria-label="몰입형 RSVP 리더" hidden>
+      <header class="reader-header reader-chrome">
+        <span class="brand">FOCUSLINE</span>
+        <div class="reader-header-actions">
+          <button class="chrome-button" id="readerWpmDown" type="button" aria-label="읽기 속도 낮추기">−</button>
+          <output id="readerWpm">300 WPM</output>
+          <button class="chrome-button" id="readerWpmUp" type="button" aria-label="읽기 속도 높이기">+</button>
+          <button class="text-button" id="exitButton" type="button">편집으로</button>
+        </div>
+      </header>
+
+      <div class="reader-stage" id="readerStage">
+        <span class="phantom-word phantom-previous" id="previousWord" aria-hidden="true"></span>
+        <span class="focus-guide" id="focusGuide" aria-hidden="true"></span>
+        <span class="word-main" id="wordMain" aria-live="off">
+          <span id="wordBefore"></span><span class="word-focus" id="wordFocus"></span><span id="wordAfter"></span>
+        </span>
+        <span class="phantom-word phantom-next" id="nextWord" aria-hidden="true"></span>
+      </div>
+
+      <div class="scrub-zone scrub-zone-left" id="previousHoldButton" aria-hidden="true"></div>
+      <div class="scrub-zone scrub-zone-right" id="nextHoldButton" aria-hidden="true"></div>
+
+      <footer class="reader-footer reader-chrome">
+        <div class="playback-actions">
+          <button class="play-button" id="playButton" type="button">
+            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 5.5 18 12 8 18.5Z" fill="currentColor" />
+            </svg>
+            <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 5h4v14H7zm6 0h4v14h-4z" fill="currentColor" />
+            </svg>
+            <span id="playLabel">일시정지</span>
+          </button>
+          <button class="icon-button" id="rewindButton" type="button" aria-label="문장 처음으로">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5v5h5M5.5 9.5A8 8 0 1 1 4 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="progress-area">
+          <input id="progressRange" type="range" min="0" max="1000" value="0" aria-label="읽기 진행률" />
+          <output id="progressOutput" for="progressRange">0%</output>
+        </div>
+
+        <output class="remaining-time" id="remainingTime">남은 시간 00:00</output>
+      </footer>
+
+      <div class="rotate-notice" aria-hidden="true">
+        <svg viewBox="0 0 32 32">
+          <rect x="5" y="9" width="22" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
+          <path d="M10 5 7 8l3 3M22 27l3-3-3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>기기를 가로로 돌려주세요</span>
+      </div>
+    </section>
+
+    <script src="./library.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
